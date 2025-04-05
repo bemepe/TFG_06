@@ -58,15 +58,15 @@ def display_chat_history(chat_history):
 
 # GUARDA LAS INTERACCIONES EN LA BASE DE DATOS 
 
-def save_interaction(chat_id, role, message):
-    """
-    Saves an interaction (user or assistant) in the MongoDB chat history collection.
-    """
+# def save_interaction(chat_id, role, message):
+#     """
+#     Saves an interaction (user or assistant) in the MongoDB chat history collection.
+#     """
 
-    collection_history.update_one(
-        {"chat_id": chat_id},
-        {"$push": {"interactions": {"role": role, "message": message, "timestamp": datetime.now(UTC).isoformat()}}}
-    )
+#     collection_history.update_one(
+#         {"chat_id": chat_id},
+#         {"$push": {"interactions": {"role": role, "message": message, "timestamp": datetime.now(UTC).isoformat()}}}
+#     )
     
     
 
@@ -149,8 +149,14 @@ def handle_conversation():
 
     st.title("Chatbot de Apoyo para Niños y Adolescentes")
 
-    chat_id = f"{datetime.now().strftime('%d%m%Y-%H%M')}_{str(ObjectId())}"
-     
+    # Inicializar el estado de la sesión
+    if "chat_id" not in st.session_state:
+        st.session_state.chat_id = f"{datetime.now().strftime('%d%m%Y-%H%M')}_{str(ObjectId())}"
+    
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
+    
+ 
     # 1 GENERA Y MUESTRA EL MENSAJE DE BIENVENIDA 
     welcome_message= invoke_chain(
         chain=welcome_chain,
@@ -162,20 +168,25 @@ def handle_conversation():
     with st.chat_message("assistant"):
         st.markdown(welcome_message.content.strip())
 
-    collection_history.insert_one({
-        "chat_id": chat_id,
-        "interactions": [{"role": "assistant", "message": welcome_message.content.strip(), "timestamp": datetime.now(UTC).isoformat()}]
-    })
+    # collection_history.insert_one({
+    #     "chat_id": chat_id,
+    #     "interactions": [{"role": "assistant", "message": welcome_message.content.strip(), "timestamp": datetime.now(UTC).isoformat()}]
+    # })
 
 
     # 2 USUARIO INGRESA LA RESPUESTA 
-    user_input = input("You: ")
-    if user_input.lower() == "exit":
-        return
+    user_input = st.chat_input("User: ", key = "main_input")
+    if user_input:
+        if user_input.lower() == "exit":
+            return
+    
+    if user_input:
+        with st.chat_message("user"):
+            st.markdown(user_input)
     
     # Guardamos al respuesta del usuario en MongoDB
 
-    save_interaction(chat_id, "user", user_input)
+    # save_interaction(chat_id, "user", user_input)
 
     # 3 INICIALIZACION DE LAS VARIABLES 
     current_state= "age"
@@ -198,20 +209,29 @@ def handle_conversation():
             chat_history=chat_history,
             context=f"Question for state: {current_state}"
         )
-        
-        # Guardamos al pregunta del assistant en MongoDB
 
-        save_interaction(chat_id, "assistant", assistant_response.content.strip())
+        with st.chat_message("assistant"):
+            st.markdown(assistant_response.content.strip())
+        
+        # Guardamos al pregunta del chatassistant en MongoDB
+
+        #save_interaction(chat_id, "assistant", assistant_response.content.strip())
 
 
         # 7 USUARIO INGRESA LA RESPUESTA  
-        user_input = input("You: ")
-        if user_input.lower() == "exit":
-            break
+
+        user_input = st.chat_input("User: ")
+        if user_input:
+            if user_input.lower() == "exit":
+                return
+    
+        if user_input:
+            with st.chat_message("user"):
+                st.markdown(user_input)
 
         # Guardamos al respuesta del usuario en MongoDB
 
-        save_interaction(chat_id, "user", user_input)
+        #save_interaction(chat_id, "user", user_input)
 
         # 8 VALIDACION DE LA RESPUESTA 
         validation_result = validate_user_response(user_input, current_state)
@@ -241,10 +261,16 @@ def handle_conversation():
         context="Details Prompt"
     )
 
-    save_interaction(chat_id, "assistant", details_response.content.strip()) 
+    with st.chat_message("assistant"):
+        st.markdown(details_response.content.strip())
+
+    #save_interaction(chat_id, "assistant", details_response.content.strip()) 
         
         # 7 USUARIO INGRESA LA RESPUESTA  
-    user_input = input("You: ")
+    user_input = input("User: ", key = "main_input")
+    if user_input:
+        with st.chat_message("user"):
+            st.markdown(user_input)
 
     # Guardar la última respuesta en chat_history y MongoDB
     
@@ -253,7 +279,7 @@ def handle_conversation():
         "message": user_input})
 
     
-    save_interaction(chat_id, "user", user_input)
+    #save_interaction(chat_id, "user", user_input)
 
     # 11 DEVUELVE EL HISTORIAL DEL CHAT 
 
@@ -308,7 +334,7 @@ def generate_final_message(classification, chat_id, chat_history):
         context=f"Final message for:{classification}",
         )
      
-    save_interaction(chat_id, "assistant", final_message.content.strip())
+    #save_interaction(chat_id, "assistant", final_message.content.strip())
 
 
 
@@ -347,11 +373,11 @@ def create_report(classification, chat_id, chat_history):
             json.dump(report, fich, indent=4, ensure_ascii=False)
 
         # Guardamos el report en la coleccion de MongoDB
-        collection_reports.update_one(
-            {"Chat_id": str(chat_id)},
-            {"$set": report},
-            upsert=True
-        )
+        # collection_reports.update_one(
+        #     {"Chat_id": str(chat_id)},
+        #     {"$set": report},
+        #     upsert=True
+        # )
         print(f"Informe del chat {chat_id} guardado en MongoDB.")
 
     except Exception as e:

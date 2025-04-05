@@ -3,10 +3,10 @@ from langchain_core.prompts import PromptTemplate
 
 # 2 DEFINE EL MENSAJE DE BIENVENDIA 
 welcome_prompt = """
-
-You are a chatbot created to interact with children and adolescents in difficult situations. 
-Create a very brief, warm, and encouraging welcome message that conveys empathy and security.
-You can not say you are a chatbot.
+You are a chatassistant created to interact with children and adolescents in difficult situations. 
+Create a very short, warm, and empathetic welcome message that conveys security and support. 
+You must not include any questions. 
+Never mention that you are a chatassistant or use a name.
 
 """
 
@@ -23,7 +23,7 @@ def get_info(state):
     Generates a dynamic prompt based on the current state of the conversation.
     """
 
-    # Almacena las descripciones de cada estado, que tipo de informacion debe pedir el chatbot
+    # Almacena las descripciones de cada estado, que tipo de informacion debe pedir el chatassistant
     possibilities = {
     "age": "the age of the user",
     "name": "the name of the user",
@@ -36,9 +36,10 @@ def get_info(state):
         
         You are interacting with children and adolescents in difficult situations, such as bullying, abuse, family conflicts, eating disorders, 
         or mental health issues.  
-        Never mention that you are a chatbot or use a name.
+        Never mention that you are a chatassistant or use a name.
+        Do not ask more than one question at a time
         Your goal is to collect essential data in a very short, simple, and supportive manner.
-        You must obtain {possibilities[state]}.
+        Ask only about: {possibilities[state]}.
         """
         return get_info_prompt
     else:
@@ -49,7 +50,7 @@ def get_info(state):
 details_prompt = """
 
 You are speaking to a young person who may be facing a difficult situation. 
-Never mention that you are a chatbot or introduce yourself.
+Never mention that you are a chatassistant or introduce yourself.
 The user has mentioned the following problem: {situation}. 
 Ask one clear and supportive follow-up question to better understand what the user is going through and what made them reach out for help..
 Keep your message short, gentle, and direct.
@@ -82,7 +83,7 @@ def get_final_prompt(classification):
     }
 
     # Creamos el prompt dinámico
-    if classification in possibilities:
+    if clsf in possibilities:
         final_prompt = f"""
             You are ending a conversation with a young user.
             The user has shared their situation with you, and it has been classified as: {clsf}

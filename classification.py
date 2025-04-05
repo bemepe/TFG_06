@@ -5,89 +5,89 @@ from langchain_ollama import ChatOllama
 from pydantic import BaseModel, Field
 
 chat_1 = [
-    {'role': 'bot', 'message': 'Hello, I am Kate. How old are you?'},
+    {'role': 'assistant', 'message': 'Hello, I am Kate. How old are you?'},
     {'role': 'user', 'message': 'I am thirteen years old'},
-    {'role': 'bot', 'message': 'Thank you for sharing. What is your name?'},
+    {'role': 'assistant', 'message': 'Thank you for sharing. What is your name?'},
     {'role': 'user', 'message': 'My name is Lucas'},
-    {'role': 'bot', 'message': 'Where are you from, Lucas?'},
+    {'role': 'assistant', 'message': 'Where are you from, Lucas?'},
     {'role': 'user', 'message': 'I am from New York'},
-    {'role': 'bot', 'message': 'Thank you for telling me. How are you feeling?'},
+    {'role': 'assistant', 'message': 'Thank you for telling me. How are you feeling?'},
     {'role': 'user', 'message': 'I am very scared. My father gets angry and hurts me when he drinks.'},
-    {'role': 'bot', 'message': 'I am really sorry to hear that. Are you in a safe place right now?'},
+    {'role': 'assistant', 'message': 'I am really sorry to hear that. Are you in a safe place right now?'},
     {'role': 'user', 'message': 'No, I am at home and he is here.'},
-    {'role': 'bot', 'message': 'I need you to find a way to stay safe. Can you call someone you trust?'},
+    {'role': 'assistant', 'message': 'I need you to find a way to stay safe. Can you call someone you trust?'},
     {'role': 'user', 'message': 'I don\'t know, I feel trapped. Please help me.'},
 ]
 
 chat_2 = [
-    {'role': 'bot', 'message': 'Hi, how old are you?'},
+    {'role': 'assistant', 'message': 'Hi, how old are you?'},
     {'role': 'user', 'message': 'I am 14.'},
-    {'role': 'bot', 'message': 'What is your name?'},
+    {'role': 'assistant', 'message': 'What is your name?'},
     {'role': 'user', 'message': 'My name is Valeria.'},
-    {'role': 'bot', 'message': 'Valeria how are you feeling today?'},
+    {'role': 'assistant', 'message': 'Valeria how are you feeling today?'},
     {'role': 'user', 'message': 'I want to die. I can not take it anymore.'},
-    {'role': 'bot', 'message': 'I am here for you. Can you tell me what is happening?'},
+    {'role': 'assistant', 'message': 'I am here for you. Can you tell me what is happening?'},
     {'role': 'user', 'message': 'I have pills in my hand. I do nott want to live.'},
-    {'role': 'bot', 'message': 'Please, put the pills down. Can you call emergency services or a trusted adult right now?'},
+    {'role': 'assistant', 'message': 'Please, put the pills down. Can you call emergency services or a trusted adult right now?'},
     {'role': 'user', 'message': 'I do not know, I just need help now!'},
 ]
 
 #urgent = 0
 
 chat_3 = [
-    {'role': 'bot', 'message': 'Hi! How old are you?'},
+    {'role': 'assistant', 'message': 'Hi! How old are you?'},
     {'role': 'user', 'message': 'I am fifteen years old'},
-    {'role': 'bot', 'message': 'What is your name?'},
+    {'role': 'assistant', 'message': 'What is your name?'},
     {'role': 'user', 'message': 'I am Daniel'},
-    {'role': 'bot', 'message': 'Where are you from, Daniel?'},
+    {'role': 'assistant', 'message': 'Where are you from, Daniel?'},
     {'role': 'user', 'message': 'I live in Texas'},
-    {'role': 'bot', 'message': 'Thank you for telling me. How are you feeling today?'},
+    {'role': 'assistant', 'message': 'Thank you for telling me. How are you feeling today?'},
     {'role': 'user', 'message': 'I feel a bit lonely because I moved to a new school and I don\'t know anyone.'},
-    {'role': 'bot', 'message': 'I see, it can be hard to adjust to a new place. Have you tried joining any clubs or activities?'},
+    {'role': 'assistant', 'message': 'I see, it can be hard to adjust to a new place. Have you tried joining any clubs or activities?'},
     {'role': 'user', 'message': 'Not yet, I don\'t know where to start.'},
-    {'role': 'bot', 'message': 'Maybe you can start by talking to one or two people in your classes. Making small connections can help.'},
+    {'role': 'assistant', 'message': 'Maybe you can start by talking to one or two people in your classes. Making small connections can help.'},
 ]
 
 chat_4 = [
-    {'role': 'bot', 'message': 'Hello! My name is Kate. How old are you?'},
+    {'role': 'assistant', 'message': 'Hello! My name is Kate. How old are you?'},
     {'role': 'user', 'message': 'I\'m 12.'},
-    {'role': 'bot', 'message': 'What\'s your name?'},
+    {'role': 'assistant', 'message': 'What\'s your name?'},
     {'role': 'user', 'message': 'I\'m Nora.'},
-    {'role': 'bot', 'message': 'Nice to meet you, Nora. Where are you from?'},
+    {'role': 'assistant', 'message': 'Nice to meet you, Nora. Where are you from?'},
     {'role': 'user', 'message': 'I live in Seville, Spain.'},
-    {'role': 'bot', 'message': 'How are you feeling today?'},
+    {'role': 'assistant', 'message': 'How are you feeling today?'},
     {'role': 'user', 'message': 'Confused... I think I might like girls but I don\'t know how to tell anyone.'},
-    {'role': 'bot', 'message': 'It\'s okay to feel this way. Have you talked to anyone about it?'},
+    {'role': 'assistant', 'message': 'It\'s okay to feel this way. Have you talked to anyone about it?'},
     {'role': 'user', 'message': 'No, my family is very religious. I heard my dad say bad things about gay people.'},
-    {'role': 'bot', 'message': 'That must be hard. Would you feel safe talking to a friend first?'},
+    {'role': 'assistant', 'message': 'That must be hard. Would you feel safe talking to a friend first?'},
     {'role': 'user', 'message': 'Maybe my cousin... she\'s open-minded. But what if others find out?'},
-    {'role': 'bot', 'message': 'You don\'t have to rush. When you\'re ready, LGBTQ+ organizations can offer support.'},
+    {'role': 'assistant', 'message': 'You don\'t have to rush. When you\'re ready, LGBTQ+ organizations can offer support.'},
     {'role': 'user', 'message': 'Thanks... I just needed to say it out loud to someone.'},
 ]
 
 #unnecessary = 1
 
 chat_5 = [
-    {'role': 'bot', 'message': 'Hello, I am here to listen and support you. How are you feeling today?'},
+    {'role': 'assistant', 'message': 'Hello, I am here to listen and support you. How are you feeling today?'},
     {'role': 'user', 'message': 'I\'m feeling like I want to hear a joke.'},
-    {'role': 'bot', 'message': 'This chat is meant to provide emotional support. Is there something on your mind?'},
+    {'role': 'assistant', 'message': 'This chat is meant to provide emotional support. Is there something on your mind?'},
     {'role': 'user', 'message': 'Yes, I\'m thinking about how to turn my math teacher into a frog.'},
-    {'role': 'bot', 'message': 'I see. If you are feeling frustrated, I can help you talk about it.'},
+    {'role': 'assistant', 'message': 'I see. If you are feeling frustrated, I can help you talk about it.'},
     {'role': 'user', 'message': 'No, I just want to know if you have magic powers.'},
-    {'role': 'bot', 'message': 'I don\'t have magic powers, but I can help you work through your feelings.'},
+    {'role': 'assistant', 'message': 'I don\'t have magic powers, but I can help you work through your feelings.'},
     {'role': 'user', 'message': 'Okay, okay... but can you tell me how to rob a bank?'},
-    {'role': 'bot', 'message': 'This chat is for support and well-being. If you need help, I am here to listen.'},
+    {'role': 'assistant', 'message': 'This chat is for support and well-being. If you need help, I am here to listen.'},
     {'role': 'user', 'message': 'Nah, I\'m just messing with you. You\'re no fun!'},
 ]
 
 chat_6 = [
-    {'role': 'bot', 'message': 'Hi, I am Kate. How old are you?'},
+    {'role': 'assistant', 'message': 'Hi, I am Kate. How old are you?'},
     {'role': 'user', 'message': 'I am 200 years old.'},
-    {'role': 'bot', 'message': 'That does not seem to be a real age. Can you tell me your actual age?'},
-    {'role': 'user', 'message': 'Nah, I just want to have fun messing with the chatbot.'},
-    {'role': 'bot', 'message': 'This chat is designed for people who need emotional support.'},
+    {'role': 'assistant', 'message': 'That does not seem to be a real age. Can you tell me your actual age?'},
+    {'role': 'user', 'message': 'Nah, I just want to have fun messing with the chatassistant.'},
+    {'role': 'assistant', 'message': 'This chat is designed for people who need emotional support.'},
     {'role': 'user', 'message': 'I don\'t care, this is boring.'},
-    {'role': 'bot', 'message': 'If you are not here for support, please exit the chat.'},
+    {'role': 'assistant', 'message': 'If you are not here for support, please exit the chat.'},
 ]
 
 chats = [chat_1, chat_2, chat_3, chat_4, chat_5, chat_6]
@@ -95,8 +95,8 @@ def build_examples(chat):
     interactions = []
 
     for interaction in chat:
-        if interaction["role"] == "bot":
-            interactions.append(f"ChatBot: {interaction['message']}")
+        if interaction["role"] == "assistant":
+            interactions.append(f"Assistant: {interaction['message']}")
         elif interaction["role"] == "user":
             interactions.append(f"User: {interaction['message']}")
     interactions = "\n".join(interactions)
@@ -143,7 +143,7 @@ def classify_chat():
     example_prompt = ChatPromptTemplate.from_messages(
     [
         ("user", "{input}"),
-        ("bot", "{output}"),
+        ("assistant", "{output}"),
     ]
 )
     few_shot_prompt = FewShotChatMessagePromptTemplate(

@@ -32,7 +32,7 @@ def report_chat(classification, chat, chat_id):
         if isinstance(interaction, HumanMessage):
             interactions.append(f"User: {interaction.content}")
         elif isinstance(interaction, AIMessage):
-            interactions.append(f"ChatBot: {interaction.content}")
+            interactions.append(f"Chatassistant: {interaction.content}")
 
     formatted_chat = interactions
 
