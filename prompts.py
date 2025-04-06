@@ -87,8 +87,9 @@ def get_final_prompt(classification):
         final_prompt = f"""
             You are ending a conversation with a young user.
             The user has shared their situation with you, and it has been classified as: {clsf}
-            You must answer the user with a short, warm, and encouraging farewell message, where you: {possibilities[clsf]}
-            Be respectful, empathetic, and appropriate to the tone of the conversation.
+            Respond diretly to the user with a short, warm, and encouraging farewell message. 
+            You should: {possibilities[clsf]}
+            Your tone must be respectful, empathetic, and appropriate to the conversation.
             """
         return final_prompt
     else:

@@ -142,7 +142,7 @@ def handle_conversation():
         st.session_state.states = ["age", "name", "location", "situation"]
         st.session_state.current_state = "age"
         st.session_state.missing_info = True
-        st.session_state.missing_info = False
+        # st.session_state.welcome_shown = False
 
     
     if st.session_state.step == 0 and not st.session_state.welcome_shown:
@@ -153,9 +153,7 @@ def handle_conversation():
                 context="Welcome Prompt"
             )
 
-        with st.chat_message("assistant"):
-            st.markdown(welcome_message.content.strip())
-        st.session_state.welcome_shown = True
+        # st.session_state.welcome_shown = True
         
     # Mostramos el historial 
     display_chat_history(st.session_state.chat_history)
@@ -172,12 +170,6 @@ def handle_conversation():
         with st.chat_message("user"):
             st.markdown(user_input)
 
-        # Como no hacemos un invoke_chain hay que guardar el historial de manera manual
-        st.session_state.chat_history.append({
-            "role": "user", 
-            "message": user_input, 
-            "timestamp": datetime.now(UTC).isoformat()
-        })
 
         # PASO 0: PREGUNTA AGE 
 
@@ -201,7 +193,7 @@ def handle_conversation():
                 st.markdown(assistant_response.content.strip())
             
             # Actualizamos el paso 
-            st.session_state.step += 1
+            st.session_state.step = 1
         
         # PASO 1: RECOGIDA DE DATOS CON VALIDACION 
         
@@ -214,6 +206,7 @@ def handle_conversation():
                 st.session_state.answers[current_state] = user_input
 
                 current_i = st.session_state.states.index(current_state)
+                ic(current_i)
 
                 if current_i == len(st.session_state.states) - 1:
                     st.session_state.missing_info = False  # Termina recogida
@@ -241,6 +234,22 @@ def handle_conversation():
                 
                 #Actualizamos el paso 
                 st.session_state.step += 1
+            
+            # Si valid = 0, vovler a preguntar 
+            
+            else:
+                # Repetir la misma pregunta
+                prompt = get_info(current_state)
+                question_chain = PromptTemplate.from_template(prompt) | llm
+
+                assistant_response = invoke_chain(
+                    chain=question_chain,
+                    input_data=user_input,
+                    chat_history=st.session_state.chat_history,
+                    context=f"Question for state: {current_state}"
+                )
+                with st.chat_message("assistant"):
+                    st.markdown(assistant_response.content.strip())
 
         # PASO FINAL: PREGUNTA DETALLES 
         elif not st.session_state.missing_info and st.session_state.step == len(st.session_state.states) + 1:
@@ -249,12 +258,26 @@ def handle_conversation():
             
             details_response = invoke_chain(
                 chain=details_chain,
-                input_data={"situation": situation},
+                input_data=situation,
                 chat_history=st.session_state.chat_history,
                 context="Details Prompt"
             )
             with st.chat_message("assistant"):
                 st.markdown(details_response.content.strip())
+            
+            final_input = st.chat_input("Do you want to share anything else?")
+
+            if final_input:
+                with st.chat_message("user"):
+                    st.markdown(final_input)
+
+                st.session_state.chat_history.append({
+                    "role": "user",
+                    "message": final_input,
+                    "timestamp": datetime.now(UTC).isoformat()
+                })
+            
+            # Pasamos a la clasificación
 
             st.session_state.step += 1  
     
@@ -301,11 +324,10 @@ def generate_final_message(classification, chat_id, chat_history):
     final_prompt = PromptTemplate.from_template(prompt)
     final_chain =  final_prompt | llm
         
-        # 6 envio de la pregunta al chatassistant
     final_message = invoke_chain(
         chain=final_chain,  
         input_data=None,
-        chat_history=st.session_state.chat_history,
+        chat_history=chat_history,
         context=f"Final message for:{classification}",
         )
     with st.chat_message("assistant"):
