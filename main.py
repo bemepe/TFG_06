@@ -5,7 +5,7 @@ from classification import classify_chat, validate_response
 import json
 from prompts import welcome_assistant, get_info, details_assistant, get_final_prompt
 from icecream import ic
-from langchain.prompts import PromptTemplate
+from langchain_core.prompts import PromptTemplate
 import streamlit as st
 from pymongo import MongoClient
 from bson.objectid import ObjectId
@@ -16,13 +16,10 @@ from datetime import datetime, UTC
 # Configuración inicial de la página
 st.set_page_config(page_title="Chatbot de Apoyo", page_icon="🤖", layout="wide")
 
-prompt = st.chat_input("Write to us, we are here to help you")
-
-
 # Creamos base de datos con dos colecciones 
 client = MongoClient("mongodb://localhost:27017/")
 
-db = client["chatassistant_prueba"]  # nueva base de datos
+db = client["chatbot_prueba"]  # base de datos
 collection_history = db["chat_history"]  # Nueva colección para almacenar el historial del chat
 collection_reports = db["chat_reports"]  # Nueva colección para almacenar los informes
 
@@ -33,30 +30,21 @@ llm = ChatOllama(
     temperature = 0,
 )
 
+# Chains a empelar: para el mensaje de bienvenida y la pregunta detallada de la situation.
+
 welcome_chain = welcome_assistant | llm 
-
 details_chain= details_assistant | llm
-
-chat_history = []
-
 
 #Función para mostrar el historial del chat en Streamlit
 
-
-def display_chat_history(chat_history):
+def display_chat_history():
 
     """Muestra el historial del chat en la interfaz de Streamlit"""
 
-    for message in chat_history:
-        if message["role"] == "assistant":
-            with st.chat_message("assistant"):
-                st.markdown(message["message"])
-        else:
-            with st.chat_message("user"):
-                st.markdown(message["message"])
+    for message in st.session_state.chat_history:
+        with st.chat_message(message["role"]):
+            st.markdown(message["message"])
 
-
-# GUARDA LAS INTERACCIONES EN LA BASE DE DATOS 
 
 def save_interaction(chat_id, role, message):
     """
@@ -68,10 +56,9 @@ def save_interaction(chat_id, role, message):
         {"$push": {"interactions": {"role": role, "message": message, "timestamp": datetime.now(UTC).isoformat()}}}
     )
     
-    
 
 # EJECUTA EL MODELO Y ALMACENA EL HISTORIAL
-def invoke_chain(chain, input_data= None, chat_history=None, context = None):
+def invoke_chain(chain, input_data= None, context = None):
     """
     Generic method to invoke chains and manage history.
     
@@ -86,7 +73,6 @@ def invoke_chain(chain, input_data= None, chat_history=None, context = None):
     else:
         result_invoke = chain.invoke(input_data)
     
-    # 2 GUARDA EN EL HISTORIAL 
 
     # Extraer la respuesta correctamente según su tipo, evitar AttributeError
     if hasattr(result_invoke, 'content'):  # Si es AIMessage
@@ -95,19 +81,23 @@ def invoke_chain(chain, input_data= None, chat_history=None, context = None):
     else:  # Si es otro tipo de objeto, como ValidationResponse
         assistant_response = str(result_invoke).strip()
 
-    if chat_history is not None:
-        if input_data: # para guardar solo si hay entrada del usuario
-            chat_history.append({
-                "role": "user", 
-                "message": input_data,
-                "timestamp":datetime.now(UTC).isoformat()})
-                
-        chat_history.append({
-            "role": "assistant", 
-            "message": assistant_response,
-            "timestamp": datetime.now(UTC).isoformat()})
-        
+    st.session_state.chat_history.append({
+        "role": "assistant", 
+        "message": assistant_response,
+        "timestamp": datetime.now(UTC).isoformat()})
     
+    save_interaction(st.session_state.chat_id, "assistant", assistant_response)
+
+
+    if input_data: # para guardar solo si hay entrada del usuario
+        st.session_state.chat_history.append({
+            "role": "user", 
+            "message": input_data,
+            "timestamp":datetime.now(UTC).isoformat()})
+        
+        save_interaction(st.session_state.chat_id, "user", input_data)
+
+                
     # 3 DEVUELVE EL RESULTADO
    
     print("Assistant: ", assistant_response)
@@ -130,16 +120,13 @@ def validate_user_response(user_input, current_state):
     validate_result = invoke_chain(
         chain=validate_chain,
         input_data=user_input,
-        chat_history=chat_history,
         context=f"Validation for {current_state}"
     )
 
     #3 DEVUELVE EL RESULTADO valid=0/1
     return validate_result
 
-# Inicializar el chat history 
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+
 
 # GESTIONA EL FLUJO DEL CHAT 
 def handle_conversation():
@@ -147,130 +134,181 @@ def handle_conversation():
     Handle conversation
     """
 
+    if "chat_id" not in st.session_state:
+        st.session_state.chat_id = f"{datetime.now().strftime('%d%m%Y-%H%M')}_{str(ObjectId())}"
+        st.session_state.chat_history = []
+        st.session_state.answers = {}
+        st.session_state.step = 0  # 0 = bienvenida, 1 = info, 2+ = cada pregunta
+        st.session_state.states = ["age", "name", "location", "situation"]
+        st.session_state.current_state = "age"
+        st.session_state.missing_info = True
+        st.session_state.invalid_counter = 0 # Cuenta las respuestas invalidas (valid =0)
+        st.session_state.forced_unnecessary = False  # Broma detectada 
+
     st.title("Chatbot de Apoyo para Niños y Adolescentes")
 
-    chat_id = f"{datetime.now().strftime('%d%m%Y-%H%M')}_{str(ObjectId())}"
-     
-    # 1 GENERA Y MUESTRA EL MENSAJE DE BIENVENIDA 
-    welcome_message= invoke_chain(
-        chain=welcome_chain,
-        input_data=None,
-        chat_history=chat_history,
-        context="Welcome Prompt"
-    )
-
-    with st.chat_message("assistant"):
-        st.markdown(welcome_message.content.strip())
-
-    collection_history.insert_one({
-        "chat_id": chat_id,
-        "interactions": [{"role": "assistant", "message": welcome_message.content.strip(), "timestamp": datetime.now(UTC).isoformat()}]
-    })
-
-
-    # 2 USUARIO INGRESA LA RESPUESTA 
-    user_input = input("You: ")
-    if user_input.lower() == "exit":
-        return
-    
-    # Guardamos al respuesta del usuario en MongoDB
-
-    save_interaction(chat_id, "user", user_input)
-
-    # 3 INICIALIZACION DE LAS VARIABLES 
-    current_state= "age"
-    answers = {}
-    missing_info = True
-
-
-    # 4 CICLO DE PREGUNTAS Y RESPUESTAS 
-    while missing_info:
-
-        # 5 generacion pregunta
-        prompt = get_info(current_state)
-        prompt_question = PromptTemplate.from_template(prompt)
-        question_chain =  prompt_question | llm
+    if not st.session_state.get("welcome_shown", False):
+        welcome_message= invoke_chain(
+                chain=welcome_chain,
+                input_data=None,
+                context="Welcome Prompt"
+            )
         
-        # 6 envio de la pregunta al chatassistant
-        assistant_response = invoke_chain(
-            chain=question_chain,  
-            input_data=user_input,
-            chat_history=chat_history,
-            context=f"Question for state: {current_state}"
-        )
-        
-        # Guardamos al pregunta del assistant en MongoDB
+    # Mostramos el historial 
+    display_chat_history()
 
-        save_interaction(chat_id, "assistant", assistant_response.content.strip())
+    # Usuario responde:
+    user_input = st.chat_input("Write to us, we are here to help you")
 
-
-        # 7 USUARIO INGRESA LA RESPUESTA  
-        user_input = input("You: ")
+    if user_input:
         if user_input.lower() == "exit":
-            break
+            return
+        # Mostrar y guardar mensaje del usuario
+        with st.chat_message("user"):
+            st.markdown(user_input)
 
-        # Guardamos al respuesta del usuario en MongoDB
 
-        save_interaction(chat_id, "user", user_input)
+        # PASO 0: PREGUNTA AGE 
 
-        # 8 VALIDACION DE LA RESPUESTA 
-        validation_result = validate_user_response(user_input, current_state)
+        if st.session_state.step == 0:
 
-        # 9 SI ES VALIDA, GUARDA LA RESPUESTA 
-        if validation_result.valid == 1:
-           
-            answers[current_state] = user_input
+            current_state = st.session_state.current_state
 
+            prompt = get_info(current_state)
+            prompt_question = PromptTemplate.from_template(prompt)
+            question_chain =  prompt_question | llm
             
-            # 10 ACTUALIZA EL ESTADO 
-            states = ["age", "name", "location", "situation"]
+            # 6 envio de la pregunta al chatassistant
+            assistant_response = invoke_chain(
+                chain=question_chain,  
+                input_data=None,
+                context=f"Question for state: {current_state}"
+            )
 
-            current_i = states.index(current_state)
-            ic(current_i)
+            with st.chat_message("assistant"):
+                st.markdown(assistant_response.content.strip())
             
-            if current_i == len(states)-1:
-                missing_info = False # se ha recopilado toda la info
-            else:
-                current_state= states[current_i + 1]
-    
-     
-    details_response= invoke_chain(
-        chain=details_chain,
-        input_data={"situation": answers.get("situation", "unknown")},
-        chat_history=chat_history,
-        context="Details Prompt"
-    )
-
-    save_interaction(chat_id, "assistant", details_response.content.strip()) 
+            # Actualizamos el paso 
+            st.session_state.step = 1
         
-        # 7 USUARIO INGRESA LA RESPUESTA  
-    user_input = input("You: ")
+        # PASO 1: RECOGIDA DE DATOS CON VALIDACION 
+        
+        elif st.session_state.step >= 1 and st.session_state.missing_info:
 
-    # Guardar la última respuesta en chat_history y MongoDB
+            current_state = st.session_state.current_state
+            validation_result = validate_user_response(user_input, current_state)
+
+            if validation_result.valid == 1:
+                st.session_state.invalid_counter = 0  # Reiniciar contador si hay una respuesta válida
+                
+                st.session_state.answers[current_state] = user_input
+
+                current_i = st.session_state.states.index(current_state)
+                ic(current_i)
+
+                if current_i == len(st.session_state.states) - 1:
+                    st.session_state.missing_info = False  # Termina recogida
+
+                # Pasamos a la siguiente pregunta
+                else:
+                    current_state= st.session_state.states[current_i + 1]
+                    st.session_state.current_state = current_state
+
+                    prompt = get_info(current_state)
+
+                    prompt_question = PromptTemplate.from_template(prompt)
+                    question_chain =  prompt_question | llm
+                    
+                    assistant_response = invoke_chain(
+                        chain=question_chain,  
+                        input_data=user_input,
+                        context=f"Question for state: {current_state}"
+                    )
+                    with st.chat_message("assistant"):
+                        st.markdown(assistant_response.content.strip())
+                
+                #Actualizamos el paso 
+                st.session_state.step += 1
+            
+            # Si valid = 0, vovler a preguntar 
+            
+            else:
+                st.session_state.invalid_counter += 1 # Marcar si valid = 0, una repeticion
+                
+                if st.session_state.invalid_counter >= 3:
+                    st.session_state.missing_info = False # Ya no recogemos ams informacion del usuario
+                    st.session_state.step = len(st.session_state.states) + 2 # Nos saltamos los pasos siguientes
+                    st.session_state.forced_unnecessary = True 
+                    return
+                
+                # Repetir la misma pregunta
+                prompt = get_info(current_state)
+                question_chain = PromptTemplate.from_template(prompt) | llm
+
+                assistant_response = invoke_chain(
+                    chain=question_chain,
+                    input_data=user_input,
+                    context=f"Question for state: {current_state}"
+                )
+                with st.chat_message("assistant"):
+                    st.markdown(assistant_response.content.strip())
+
+        # PASO FINAL: PREGUNTA DETALLES 
+        elif not st.session_state.missing_info and st.session_state.step == len(st.session_state.states) + 1:
+
+            # Sacamos el nombre y la situaciones de las answers del usuario
+            situation = st.session_state.answers.get("situation", "unknown")
+            name = st.session_state.answers.get("name", "unknown") 
+
+            details_response = invoke_chain(
+                chain=details_chain,
+                input_data={"situation": situation, "name": name},
+                context="Details Prompt"
+            )
+
+            with st.chat_message("assistant"):
+                st.markdown(details_response.content.strip())
+            
+            final_input = st.chat_input("Do you want to share anything else?")
+
+            if final_input:
+                with st.chat_message("user"):
+                    st.markdown(final_input)
+
+                st.session_state.chat_history.append({
+                    "role": "user",
+                    "message": final_input,
+                    "timestamp": datetime.now(UTC).isoformat()
+                })
+
+                save_interaction(st.session_state.chat_id, "user", final_input)
+            
+            # Pasamos a la clasificación
+
+            st.session_state.step += 1  
     
-    chat_history.append({
-        "role": "user",
-        "message": user_input})
-
-    
-    save_interaction(chat_id, "user", user_input)
-
-    # 11 DEVUELVE EL HISTORIAL DEL CHAT 
-
-    print("Historial de chat guardado en MongoDB en tiempo real.")
-    return chat_id, chat_history 
+                    
 
 # CLASIFICA EL CHAT 
-def classify_conversation(chat_history, chat_id):
+def classify_conversation():
     """
     Classify the conversation based on the text provided.
     """
+
+    if st.session_state.get("forced_unnecessary", False):
+        class Result:
+            urgency = 0
+            unnecessary = 1
+        print("Forced classification as inappropriate use for 3 invalid answers. ")
+        return Result()
+    
+    # Si forced_unnecesary es False, seguimos con la clasificacion normal
     # Obtenemos la cadena 
     classify_chain = classify_chat()
     interactions = []
 
     # 2 RECORRE EL HISTORIAL Y GUARDA LAS INTERACCIONES 
-    for interaction in chat_history:
+    for interaction in st.session_state.chat_history:
         if interaction["role"] =="assistant": # Mensaje del Assistant
             interactions.append(f"Assistant: {interaction['message']}")
 
@@ -284,14 +322,14 @@ def classify_conversation(chat_history, chat_id):
         chain=classify_chain,  
         input_data={"input": formatted_chat},
         chat_history=None,
-        context=f"Classification for Chat {chat_id}"
+        context=f"Classification for Chat {st.session_state.chat_id}"
     )
-    print(f"Chat{chat_id}\nClassification: {classification_result}\n")
+    print(f"Chat{st.session_state.chat_id}\nClassification: {classification_result}\n")
     return classification_result
 
 # GENERA EL MENSAJE DE DESPEDIDA EN FUNCION DEL RESULTADO DE LA CLASIFICACIÓN
 
-def generate_final_message(classification, chat_id, chat_history):
+def generate_final_message(classification):
     """
     Generate a final message from the chatassistant based on the classification result.
     """
@@ -300,21 +338,19 @@ def generate_final_message(classification, chat_id, chat_history):
     final_prompt = PromptTemplate.from_template(prompt)
     final_chain =  final_prompt | llm
         
-        # 6 envio de la pregunta al chatassistant
     final_message = invoke_chain(
         chain=final_chain,  
         input_data=None,
-        chat_history=chat_history,
         context=f"Final message for:{classification}",
         )
-     
-    save_interaction(chat_id, "assistant", final_message.content.strip())
-
-
+    
+    with st.chat_message("assistant"):
+        st.markdown(final_message.content.strip())
+    
 
 
 # CREA UN INFORME JSON CON LA CONVERSACION Y LA CLASIFICACION
-def create_report(classification, chat_id, chat_history):
+def create_report(classification):
     """
     Generate a report at the end of the conversation with the chat_history and the classification.
     """
@@ -322,40 +358,38 @@ def create_report(classification, chat_id, chat_history):
     interactions = []
 
     # 2 RECORRE EL HISTORIAL Y GUARDA LAS INTERACCIONES 
-    for interaction in chat_history:
+    for interaction in st.session_state.chat_history:
         if interaction["role"] =="assistant": # Mensaje del Chatassistant
             interactions.append(f"Assistant: {interaction['message']}")
 
         elif interaction["role"]=="user":
             interactions.append(f"User: {interaction['message']}")
-    
-    #Aqui no ahcemos el join porque queda mal estructurado, no lo veo encesario
-    # formatted_chat = "\n".join(interactions)
+
     
     # 3 CREACION DEL INFORME EN FORMATO JSON
     try: 
         report ={
-            "Chat_id": str(chat_id),
-            "Title": f"Chat {chat_id}",
+            "Chat_id": str(st.session_state.chat_id),
+            "Title": f"Chat {st.session_state.chat_id}",
             "Content": interactions,
-            "Classification_urgency": classification.urgency,
-            "Classification_unnecessary": classification.unnecessary,
+            "Classification_urgency": int(classification.urgency),
+            "Classification_unnecessary": int(classification.unnecessary),
         }
 
-        # Guardamos el report en un archivo JSON
-        with open (f"chat_report_{chat_id}.json", "w", encoding= "utf-8") as fich:
+        # Guardamos el report en un archivo local en formato JSON
+        with open (f"chat_report_{st.session_state.chat_id}.json", "w", encoding= "utf-8") as fich:
             json.dump(report, fich, indent=4, ensure_ascii=False)
 
-        # Guardamos el report en la coleccion de MongoDB
         collection_reports.update_one(
-            {"Chat_id": str(chat_id)},
+            {"Chat_id": str(st.session_state.chat_id)},
             {"$set": report},
             upsert=True
         )
-        print(f"Informe del chat {chat_id} guardado en MongoDB.")
+
+        print(f"Informe del chat {st.session_state.chat_id} guardado en MongoDB.")
 
     except Exception as e:
-        print(f"Error al guardar el informe del chat {chat_id}: {e}")
+        print(f"Error al guardar el informe del chat {st.session_state.chat_id}: {e}")
 
 
 def main():
@@ -364,18 +398,20 @@ def main():
     """
 
     # Manejar la conversación y obtener el historial de chat
-    chat_id, chat_history = handle_conversation()
+    handle_conversation()
+    
+    if st.session_state.step == len(st.session_state.states) + 2:  # flujo completo
+       
+        # Clasificar la conversación basada en el historial
+        classification = classify_conversation()
 
-    # Clasificar la conversación basada en el historial
-    classification = classify_conversation(chat_history, chat_id)
+        generate_final_message(classification)
 
-    generate_final_message(classification, chat_id, chat_history)
-
-    if classification is not None:
-        create_report(classification, chat_id, chat_history)
-    # Crear y mostrar el reporte final
-    else:
-        print("Error: No classification result available.")
+        if classification is not None:
+            create_report(classification)
+        # Crear y mostrar el reporte final
+        else:
+            print("Error: No classification result available.")
 
 if __name__ =="__main__":
     main()

@@ -36,7 +36,7 @@ def get_info(state):
         
         You are interacting with children and adolescents in difficult situations, such as bullying, abuse, family conflicts, eating disorders, 
         or mental health issues.  
-        Never mention that you are a chatassistant or use a name.
+        Never mention that you are a chatbot or use a name.
         Do not ask more than one question at a time
         Your goal is to collect essential data in a very short, simple, and supportive manner.
         Ask only about: {possibilities[state]}.
@@ -50,15 +50,17 @@ def get_info(state):
 details_prompt = """
 
 You are speaking to a young person who may be facing a difficult situation. 
-Never mention that you are a chatassistant or introduce yourself.
+Never mention that you are a chatbot or introduce yourself.
 The user has mentioned the following problem: {situation}. 
+Their name is: {name}
+Address them by name in a gentle way at the beginning.
 Ask one clear and supportive follow-up question to better understand what the user is going through and what made them reach out for help..
 Keep your message short, gentle, and direct.
 
 """
 
 details_assistant = PromptTemplate(
-    input_variables=["situation"],
+    input_variables=["name","situation"],
     template=details_prompt
 )
 
