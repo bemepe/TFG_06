@@ -68,20 +68,26 @@ def get_final_prompt(classification):
     """
     Generates a dynamic farewell prompt based on the classification result.
     """
+    try: 
+        urgency = int(classification.urgency)
+        unnecessary = int(classification.unnecessary)
+    except:
+        return None
 
-    # Construimos una clave a partir de los valores
-    if classification.urgency == 1 and classification.unnecessary == 0:
+    if urgency == 1 and unnecessary == 0:
         clsf = "urgent"
-    elif classification.urgency == 0 and classification.unnecessary == 0:
+    elif urgency == 0 and unnecessary == 0:
         clsf = "non_urgent"
-    elif classification.unnecessary == 1:
-        clsf = "unnecesary"
+    elif urgency == 0 and unnecessary == 1:
+        clsf = "unnecessary"
+    else:
+        return None  # Clasificación no válida
 
     # Diccionario de posibilidades según la clasificación
     possibilities = {
-        "urgent": "thank the user for sharing their feelings and situation and inform them that a report has been created and their case will be referred immediately to a medical professional for help.",
-        "non_urgent": "thank the user and let them know a report has been created and will be reviewed by a professional. Encourage them to take care and reach out again if needed.",
-        "unnecessary": "politely remind the user that this chat is for serious situations only, and highlights the importance of using the platform responsibly to ensure it remains available for those who truly need it"
+        "urgent": "respond diretly to the user with a short, warm, and encouraging farewell message. And thank the user for sharing their feelings and situation and inform them that a report has been created and their case will be referred immediately to a medical professional for help.",
+        "non_urgent": "respond diretly to the user with a short, warm, and encouraging farewell message. And thank the user and let them know a report has been created and will be reviewed by a professional. Encourage them to take care and reach out again if needed.",
+        "unnecessary": "respond directly to the user to gently remind them that this chat is for serious situations only, and stresses the importance of using the platform responsibly to ensure that it remains available to those who really need it",
     }
 
     # Creamos el prompt dinámico
@@ -89,9 +95,11 @@ def get_final_prompt(classification):
         final_prompt = f"""
             You are ending a conversation with a young user.
             The user has shared their situation with you, and it has been classified as: {clsf}
-            Respond diretly to the user with a short, warm, and encouraging farewell message. 
             You should: {possibilities[clsf]}
-            Your tone must be respectful, empathetic, and appropriate to the conversation.
+            Your answer must be very concise, respectful, and appropriate to the conversation.
+            Do not explain what you're doing or refer to yourself. 
+            Only output the final message. No titles, explanations, or formatting.
+            
             """
         return final_prompt
     else:

@@ -76,17 +76,20 @@ def invoke_chain(chain, input_data= None, context = None):
 
     # Extraer la respuesta correctamente según su tipo, evitar AttributeError
     if hasattr(result_invoke, 'content'):  # Si es AIMessage
-        assistant_response = result_invoke.content.strip()
+        assistant_response = result_invoke.content.strip().strip('"')
 
-    else:  # Si es otro tipo de objeto, como ValidationResponse
+        st.session_state.chat_history.append({
+            "role": "assistant", 
+            "message": assistant_response,
+            "timestamp": datetime.now(UTC).isoformat()})
+        
+        save_interaction(st.session_state.chat_id, "assistant", assistant_response)
+
+    else:
+        # Si no tiene .content, asumimos que es una respuesta estructurada (validación, clasificación...)
+        # Guardamos en MongoDB, pero no en el historial
         assistant_response = str(result_invoke).strip()
-
-    st.session_state.chat_history.append({
-        "role": "assistant", 
-        "message": assistant_response,
-        "timestamp": datetime.now(UTC).isoformat()})
-    
-    save_interaction(st.session_state.chat_id, "assistant", assistant_response)
+        save_interaction(st.session_state.chat_id, "assistant", assistant_response)
 
 
     if input_data: # para guardar solo si hay entrada del usuario
@@ -142,19 +145,23 @@ def handle_conversation():
         st.session_state.states = ["age", "name", "location", "situation"]
         st.session_state.current_state = "age"
         st.session_state.missing_info = True
+        st.session_state.welcome_shown = False
         st.session_state.invalid_counter = 0 # Cuenta las respuestas invalidas (valid =0)
         st.session_state.forced_unnecessary = False  # Broma detectada 
 
     st.title("Chatbot de Apoyo para Niños y Adolescentes")
 
-    if not st.session_state.get("welcome_shown", False):
+    if not st.session_state.welcome_shown:
         welcome_message= invoke_chain(
                 chain=welcome_chain,
                 input_data=None,
                 context="Welcome Prompt"
             )
         
+        st.session_state.welcome_shown = True
+
     # Mostramos el historial 
+    
     display_chat_history()
 
     # Usuario responde:
@@ -163,10 +170,6 @@ def handle_conversation():
     if user_input:
         if user_input.lower() == "exit":
             return
-        # Mostrar y guardar mensaje del usuario
-        with st.chat_message("user"):
-            st.markdown(user_input)
-
 
         # PASO 0: PREGUNTA AGE 
 
@@ -181,13 +184,14 @@ def handle_conversation():
             # 6 envio de la pregunta al chatassistant
             assistant_response = invoke_chain(
                 chain=question_chain,  
-                input_data=None,
+                input_data=user_input,
                 context=f"Question for state: {current_state}"
             )
 
             with st.chat_message("assistant"):
                 st.markdown(assistant_response.content.strip())
-            
+
+
             # Actualizamos el paso 
             st.session_state.step = 1
         
@@ -200,22 +204,21 @@ def handle_conversation():
 
             if validation_result.valid == 1:
                 st.session_state.invalid_counter = 0  # Reiniciar contador si hay una respuesta válida
-                
                 st.session_state.answers[current_state] = user_input
-
                 current_i = st.session_state.states.index(current_state)
                 ic(current_i)
 
                 if current_i == len(st.session_state.states) - 1:
                     st.session_state.missing_info = False  # Termina recogida
-
+                    
+                    st.session_state.step = len(st.session_state.states)
                 # Pasamos a la siguiente pregunta
                 else:
                     current_state= st.session_state.states[current_i + 1]
                     st.session_state.current_state = current_state
-
+                    
+                    st.session_state.step += 1
                     prompt = get_info(current_state)
-
                     prompt_question = PromptTemplate.from_template(prompt)
                     question_chain =  prompt_question | llm
                     
@@ -224,14 +227,13 @@ def handle_conversation():
                         input_data=user_input,
                         context=f"Question for state: {current_state}"
                     )
+                    
                     with st.chat_message("assistant"):
                         st.markdown(assistant_response.content.strip())
                 
-                #Actualizamos el paso 
-                st.session_state.step += 1
-            
-            # Si valid = 0, vovler a preguntar 
-            
+                 
+
+            # Si valid = 0, volver a preguntar 
             else:
                 st.session_state.invalid_counter += 1 # Marcar si valid = 0, una repeticion
                 
@@ -242,19 +244,23 @@ def handle_conversation():
                     return
                 
                 # Repetir la misma pregunta
-                prompt = get_info(current_state)
-                question_chain = PromptTemplate.from_template(prompt) | llm
+                repeat_prompt = get_info(current_state)
+                repeat_chain = PromptTemplate.from_template(repeat_prompt) | llm
 
                 assistant_response = invoke_chain(
-                    chain=question_chain,
+                    chain=repeat_chain,
                     input_data=user_input,
-                    context=f"Question for state: {current_state}"
+                    context=f"Repeat question for state: {current_state}"
                 )
+                
                 with st.chat_message("assistant"):
                     st.markdown(assistant_response.content.strip())
 
-        # PASO FINAL: PREGUNTA DETALLES 
-        elif not st.session_state.missing_info and st.session_state.step == len(st.session_state.states) + 1:
+            print("STEP CHECK:", st.session_state.step)
+            print("MISSING INFO:", st.session_state.missing_info)
+
+        # PASO 2 Pregunta final de detalles
+        elif not st.session_state.missing_info and st.session_state.step == len(st.session_state.states):
 
             # Sacamos el nombre y la situaciones de las answers del usuario
             situation = st.session_state.answers.get("situation", "unknown")
@@ -268,26 +274,28 @@ def handle_conversation():
 
             with st.chat_message("assistant"):
                 st.markdown(details_response.content.strip())
-            
-            final_input = st.chat_input("Do you want to share anything else?")
 
-            if final_input:
+
+            st.session_state.step +=1
+        
+        # PASO 3 Ultima interaccion
+        elif st.session_state.step ==len(st.session_state.states) + 2:
+            
+            user_final_input = st.chat_input("Do you want to share anything else?")
+
+            if user_final_input:
                 with st.chat_message("user"):
-                    st.markdown(final_input)
+                    st.markdown(user_final_input)
 
                 st.session_state.chat_history.append({
                     "role": "user",
-                    "message": final_input,
+                    "message": user_final_input,
                     "timestamp": datetime.now(UTC).isoformat()
                 })
 
-                save_interaction(st.session_state.chat_id, "user", final_input)
-            
-            # Pasamos a la clasificación
+                save_interaction(st.session_state.chat_id, "user", user_final_input)
+                st.session_state.step += 1
 
-            st.session_state.step += 1  
-    
-                    
 
 # CLASIFICA EL CHAT 
 def classify_conversation():
@@ -321,9 +329,14 @@ def classify_conversation():
     classification_result = invoke_chain(
         chain=classify_chain,  
         input_data={"input": formatted_chat},
-        chat_history=None,
         context=f"Classification for Chat {st.session_state.chat_id}"
     )
+
+    # Corregir incoherencia: urgencia y uso innecesario no pueden coexistir
+
+    if classification_result.urgency == 1 and classification_result.unnecessary == 1:
+        classification_result.unnecessary = 0
+    
     print(f"Chat{st.session_state.chat_id}\nClassification: {classification_result}\n")
     return classification_result
 
@@ -345,8 +358,7 @@ def generate_final_message(classification):
         )
     
     with st.chat_message("assistant"):
-        st.markdown(final_message.content.strip())
-    
+        st.markdown(final_message.content.strip().strip('"'))
 
 
 # CREA UN INFORME JSON CON LA CONVERSACION Y LA CLASIFICACION
